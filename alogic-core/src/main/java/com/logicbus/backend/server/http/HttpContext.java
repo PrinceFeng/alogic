@@ -67,6 +67,15 @@ import com.logicbus.backend.Context;
  * 
  * @version 1.6.11.12 [20170123 duanyy] <br>
  * - http响应的缓存属性改成由服务来个性化控制 <br>
+ * 
+ * @version 1.6.11.45 [duanyy 20180722] <br>
+ * - 增加getHostDomain方法 <br>
+ * 
+ * @version 1.6.11.48 [20180807 duanyy] <br>
+ * - 优化缓存相关的http控制头的输出 <br>
+ * 
+ * @version 1.6.11.50 [20180808 duanyy] <br>
+ * - 从Http头中获取Sample信息 <br>
  */
 
 public class HttpContext extends Context {
@@ -188,7 +197,12 @@ public class HttpContext extends Context {
 
 	@Override
 	public String getHost() {
-		return request.getLocalAddr() + ":" + request.getLocalPort();
+		return String.format("%s:%d",request.getLocalAddr(),request.getLocalPort());
+	}
+	
+	@Override
+	public String getHostDomain(){
+		return String.format("%s:%d",request.getServerName(),request.getServerPort());
 	}
 
 	@Override
@@ -216,7 +230,7 @@ public class HttpContext extends Context {
 		if (StringUtils.isEmpty(globalSerial)){
 			globalSerial = request.getHeader("GlobalSerial");
 			if (StringUtils.isEmpty(globalSerial)){
-				String sample = request.getParameter("sample");
+				String sample = request.getHeader("sample");
 				globalSerial = createGlobalSerial(StringUtils.isNotEmpty(sample) && Boolean.parseBoolean(sample));
 			}
 		}
@@ -326,12 +340,9 @@ public class HttpContext extends Context {
 				}else{
 					response.setCharacterEncoding(encoding);
 					if (enableClientCache()){
-						response.setHeader("Cache-Control", "public");
+						cacheTool.cacheEnable(response);
 					}else{
-						response.setHeader("Expires", "Mon, 26 Jul 1970 05:00:00 GMT");
-						response.setHeader("Last-Modified", "Mon, 26 Jul 1970 05:00:00 GMT");
-						response.setHeader("Cache-Control", "no-cache, must-revalidate");
-						response.setHeader("Pragma", "no-cache");
+						cacheTool.cacheDisable(response);
 					}
 					msg.finish(this,!cometMode());
 				}
@@ -354,10 +365,13 @@ public class HttpContext extends Context {
 	
 	public static String ForwardedHeader = "X-Forwarded-For";
 	public static String RealIp = "X-Real-IP";
+	public static HttpCacheTool cacheTool = null;
+	
 	static{
 		Settings settings = Settings.get();
 		ForwardedHeader = settings.GetValue("http.forwardedheader", ForwardedHeader);
 		RealIp = settings.GetValue("http.realip", RealIp);
+		cacheTool = settings.getToolkit(HttpCacheTool.class);
 	}
 	
 	/**

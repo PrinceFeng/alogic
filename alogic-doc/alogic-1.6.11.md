@@ -253,3 +253,89 @@ alogic-1.6.11
 - alogic-common:cache模型中cache-hset,cache-sadd等支持raw模式;
 - alogic-common:xscript的get支持raw模式; 
 - alogic-common:xscript增加array-set-list指令;
+
+### 1.6.11.44 [20180713 duanyy]
+
+- alogic-common:xscript的eval插件在脚本编译时采用Settings作为变量集;
+- alogic-common:增加LocalLock工具类;
+- alogic-common:webloader增加webcontext.vroot变量;
+
+### 1.6.11.45 [20180722 duanyy]
+- alogic-auth:sso的ClientSideHandler增加从cookies获取token的模式;
+- alogic-common:缓存框架增加nocache模式;
+- alogic-common:Redirector只是contextPath;
+- alogic-dbcp:增加HotSQLLoader实现;
+- alogic-core:Context增加getHostDomain方法;
+- alogic-together:服务内置变量增加$url,$hostdomain;
+
+### 1.6.11.46 [20180726 duanyy]
+- alogic-common:修正XscriptCache的问题;
+- alogic-lucene:修改QueryBuilder,build时增加Analyzer上下文;
+- alogic-lucene:增加ByMatch,ByTerms等QueryBuilder实现;
+
+### 1.6.11.47 [20180806 duanyy] 
+- alogic-core:修正MixedAccessController的配置参数问题;
+- alogic-dbcp:conn插件支持已有上层对象;
+
+### 1.6.11.48 [20180807 duanyy]
+- 优化服务和资源的缓存相关的http控制头;
+
+### 1.6.11.49 [20180808 duanyy]
+- alogic-vfs:修正下载中文名的乱码问题;
+
+### 1.6.11.50 [20180808 duanyy]
+- alogic-rpc:Gateway增加form数据的拦截模式;
+- alogic-rpc:优化Gateway的缓存处理;
+
+### 1.6.11.51 [20180810 duanyy]
+- alogic-common:xscript的set指令增加raw模式;
+
+### 1.6.11.52 [20180816 duanyy]
+- alogic-lucene:增加删除文档的xscript插件;
+
+### 1.6.11.53 [20180817 duanyy]
+- alogic-vfs:增加基于amazon s3的BlobManager实现;
+
+### 1.6.11.54 [20180822 duanyy]
+- alogic-common:增加所生成证书的keyUsage和extKeyUsage的设置;
+
+### 1.6.11.55 [20180822 duanyy]
+- alogic-common:增加获取证书序列号功能;
+
+### 1.6.11.56 [20180823 duanyy]
+- alogic-common:证书的序列号可定制;
+
+### 1.6.11.57 [20180828 duanyy]
+- alogic-common:增加regex-match插件;
+- alogic-auth:SessionAccessController增加浏览器会话id的传递;
+
+### 1.6.11.58 [20180829 duanyy]
+- alogic-common:增加树相关的操作，如数组转换为树，树遍历等;
+- alogic-dbcp:修正on-load事件处理问题;
+- alogic-common:修正on-load事件处理问题;
+- alogic-kvalue:修正on-load事件处理问题
+
+### 1.6.11.59 [20180911 duanyy]
+- alogic-auth:增加AuthenticationHandler的脚本化实现Default.
+
+### 1.6.11.60 [20180912 duanyy]
+- alogic-auth:增加cas单点登录的服务端和客户端实现;
+- alogic-common:增加cache-new指令，用来新增缓存对象;
+- alogic-common:增加array-set-save指令,用来将数组保存为字符串，并存储到指定变量;
+- alogic-common:增加xml-text-append和xml-text-child指令，用来存取xml节点的直接文本子节点
+
+### 1.6.11.61 [20180913 duanyy]
+- alogic-rpc:增加ssl协议支持的配置;
+- alogic-auth:增加oauth2.0客户端框架;
+
+### 1.6.11.62 [20180928 duanyy] 
+- alogic-auth:增加oauth2.0服务端框架;
+- alogic-rpc:修正urlbuilder，支持已有?字符检测;
+- alogic-core:JsonMessage清除冗余代码;
+
+### 1.6.11
+- 发布1.6.11版本
+
+
+
+

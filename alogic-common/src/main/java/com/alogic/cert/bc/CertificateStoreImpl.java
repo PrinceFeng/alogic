@@ -15,7 +15,6 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Security;
-import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
 import java.util.Date;
 
@@ -27,12 +26,19 @@ import org.w3c.dom.Element;
 import com.alogic.cert.CertificateContent;
 import com.alogic.cert.CertificateStore;
 import com.anysoft.util.IOTools;
+import com.anysoft.util.KeyGen;
 import com.anysoft.util.Properties;
 import com.anysoft.util.PropertiesConstants;
 import com.anysoft.util.XmlElementProperties;
 
+import org.bouncycastle.asn1.ASN1EncodableVector;
+import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.KeyPurposeId;
+import org.bouncycastle.asn1.x509.KeyUsage;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.cert.CertIOException;
 import org.bouncycastle.cert.X509CertificateHolder;  
 import org.bouncycastle.cert.X509v3CertificateBuilder;  
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;  
@@ -46,6 +52,15 @@ import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
  * @author yyduan
  *
  * @since 1.6.11.10
+ * 
+ * @version 1.6.11.54 [20180822 duanyy] <br>
+ * - 增加所生成证书的keyUsage和extKeyUsage的设置; <br>
+ * 
+ * @version 1.6.11.55 [20180822 duanyy] <br>
+ * - 增加获取证书序列号功能; <br>
+ * 
+ * @version 1.6.11.56 [20180823 duanyy] <br>
+ * - 证书的序列号可定制; <br>
  */
 public class CertificateStoreImpl implements CertificateStore{
 	/**
@@ -116,7 +131,7 @@ public class CertificateStoreImpl implements CertificateStore{
 	/**
 	 * 根证书
 	 */
-	protected Certificate rootCert = null;
+	protected X509Certificate rootCert = null;
 	
 	/**
 	 * 根证书私钥
@@ -211,7 +226,7 @@ public class CertificateStoreImpl implements CertificateStore{
 				}finally{
 					IOTools.close(in);
 				}
-				rootCert = keyStore.getCertificate(jksRootAlias);
+				rootCert = (X509Certificate) keyStore.getCertificate(jksRootAlias);
 				rootKey = (PrivateKey)keyStore.getKey(jksRootAlias, jksPwd.toCharArray());
 			}else{
 				keyStore.load(null, jksPwd.toCharArray());
@@ -228,12 +243,14 @@ public class CertificateStoreImpl implements CertificateStore{
 		        
 				X509v3CertificateBuilder builder = new X509v3CertificateBuilder(
 					new X500Name(getRootX500Name()),
-					BigInteger.valueOf(now), 
+					BigInteger.valueOf(now * 10000 + Integer.parseInt(KeyGen.uuid(5, 0, 9))),
 					new Date(now), 
 					new Date(now + rootTTL * 365 * 24L * 60L * 60L * 1000L), 
 					new X500Name(getRootX500Name()), 
 					SubjectPublicKeyInfo.getInstance(pubk.getEncoded())
 				);
+				
+				addExtension(builder);
 				
 	            X509CertificateHolder holder = builder.build(
 	            	new JcaContentSignerBuilder(algorithm).setSecureRandom(secureRandom).setProvider("BC").build(prik)
@@ -252,7 +269,7 @@ public class CertificateStoreImpl implements CertificateStore{
 					IOTools.close(out);
 				}
 				
-				rootCert = keyStore.getCertificate(jksRootAlias);
+				rootCert = (X509Certificate) keyStore.getCertificate(jksRootAlias);
 				rootKey = (PrivateKey)keyStore.getKey(jksRootAlias, jksPwd.toCharArray());
 			}
 		}catch (Exception ex){
@@ -263,7 +280,7 @@ public class CertificateStoreImpl implements CertificateStore{
 	@Override
 	public CertificateContent getRoot(CertificateContent content) {
 		try {
-			content.setContent(rootCert.getEncoded(), rootKey.getEncoded());			
+			content.setContent(rootCert.getSerialNumber().toString(),rootCert.getEncoded(), rootKey.getEncoded());			
 		}catch (Exception ex){
 			LOG.error(ExceptionUtils.getStackTrace(ex));
 		}
@@ -271,13 +288,13 @@ public class CertificateStoreImpl implements CertificateStore{
 	}
 	
 	@Override
-	public CertificateContent newCertificate(CertificateContent content,String cn) {
-		return newCertificate(content,getX500Name(cn),null);
+	public CertificateContent newCertificate(BigInteger sn,CertificateContent content,String cn) {
+		return newCertificate(sn,content,getX500Name(cn),null);
 	}
 	
 	@Override
-	public CertificateContent newCertificate(CertificateContent content,Properties p) {
-		return newCertificate(content,getX500Name(p),p);
+	public CertificateContent newCertificate(BigInteger sn,CertificateContent content,Properties p) {
+		return newCertificate(sn,content,getX500Name(p),p);
 	}
 	
 	/**
@@ -287,7 +304,7 @@ public class CertificateStoreImpl implements CertificateStore{
 	 * @param subject x500name
 	 * @param p 参数
 	 */
-	protected CertificateContent newCertificate(CertificateContent content,String subject,Properties p){
+	protected CertificateContent newCertificate(BigInteger sn,CertificateContent content,String subject,Properties p){
 		try {
 			long ttl = p == null ? rootTTL : PropertiesConstants.getLong(p, "ttl", rootTTL);
 			long now = System.currentTimeMillis();
@@ -301,24 +318,55 @@ public class CertificateStoreImpl implements CertificateStore{
 	        //构造证书
 			X509v3CertificateBuilder builder = new X509v3CertificateBuilder(
 				new X500Name(getRootX500Name()),
-				BigInteger.valueOf(now), 
+				sn, 
 				new Date(now), 
 				new Date(now + ttl * 365 * 24L * 60L * 60L * 1000L), 
 				new X500Name(subject), 
 				SubjectPublicKeyInfo.getInstance(pubk.getEncoded())
 			);
 			
+			addExtension(builder);
+			
 			//用根证书的Key进行签名
 			X509CertificateHolder holder = builder.build(
             		new JcaContentSignerBuilder(algorithm).setSecureRandom(secureRandom).setProvider("BC").build(rootKey)
             		);  
-  
+			
             X509Certificate certifacate = new JcaX509CertificateConverter().getCertificate(holder);
-			content.setContent(certifacate.getEncoded(), prik.getEncoded());
+            
+			content.setContent(certifacate.getSerialNumber().toString(),certifacate.getEncoded(), prik.getEncoded());
 		}catch (Exception ex){
 			LOG.error(ExceptionUtils.getStackTrace(ex));
 		}
 		return content;
 	}
+	
+	public void addExtension(X509v3CertificateBuilder builder) throws CertIOException{		
+		
+		int usage = KeyUsage.digitalSignature;  
+        usage += KeyUsage.nonRepudiation;  
+        usage += KeyUsage.keyEncipherment;  
+        usage += KeyUsage.dataEncipherment;  
+        usage += KeyUsage.keyAgreement;  
+        usage += KeyUsage.keyCertSign;  
+        usage += KeyUsage.cRLSign;  
+        usage += KeyUsage.encipherOnly;  
+        usage += KeyUsage.decipherOnly;  
+  
+        builder.addExtension(Extension.keyUsage, true, new KeyUsage(usage));  		
+		
+		ASN1EncodableVector extKeyUsage = new ASN1EncodableVector();
+		extKeyUsage.add(KeyPurposeId.anyExtendedKeyUsage);
+		extKeyUsage.add(KeyPurposeId.id_kp_clientAuth);
+		extKeyUsage.add(KeyPurposeId.id_kp_serverAuth);
+		extKeyUsage.add(KeyPurposeId.id_kp_scvpClient);
+		extKeyUsage.add(KeyPurposeId.id_kp_scvpServer);
+		extKeyUsage.add(KeyPurposeId.id_kp_codeSigning);
+		extKeyUsage.add(KeyPurposeId.id_kp_emailProtection);
+		extKeyUsage.add(KeyPurposeId.id_kp_timeStamping);
+		
+		builder.addExtension(Extension.extendedKeyUsage, false, new DERSequence(extKeyUsage));
+	}
 }
+
 

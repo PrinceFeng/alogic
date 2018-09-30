@@ -3,6 +3,8 @@ package com.alogic.vfs.service;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
@@ -12,10 +14,12 @@ import com.alogic.vfs.core.VirtualFileSystem;
 import com.anysoft.util.IOTools;
 import com.anysoft.util.Properties;
 import com.anysoft.util.PropertiesConstants;
+import com.anysoft.util.Settings;
 import com.logicbus.backend.Context;
 import com.logicbus.backend.Servant;
 import com.logicbus.backend.ServantException;
 import com.logicbus.backend.message.Message;
+import com.logicbus.backend.server.http.HttpCacheTool;
 import com.logicbus.models.servant.ServiceDescription;
 
 /**
@@ -26,18 +30,31 @@ import com.logicbus.models.servant.ServiceDescription;
  * 
  * @version 1.6.4.37 [duanyy 20151218] <br>
  * - 输出文件可缓存 <br>
+ * 
+ * @version 1.6.11.48 [20180807 duanyy] <br>
+ * - 优化缓存相关的http控制头的输出 <br>
+ * 
+ * @version 1.6.11.53 [20180817 duanyy] <br>
+ * - 支持前端输入filename和contentType参数，并写出到Response中 <br>
+ * 
+ * @version 1.6.11.59 [20180911 duanyy] <br>
+ * - 将filename参数改成可选参数;
  */
 public class Download extends Servant {
 	protected byte [] buffer = null;
 	protected boolean cacheEnable = true;	
+	protected HttpCacheTool cacheTool = null;
+	protected String encoding = "utf-8";
+	
 	@Override
 	public void create(ServiceDescription sd){
 		super.create(sd);
 		Properties p = sd.getProperties();
 		cacheEnable = PropertiesConstants.getBoolean(p, "cacheEnable", true);
 		int bufferSize = PropertiesConstants.getInt(p, "bufferSize", 10240,true);
-		
+		encoding = PropertiesConstants.getString(p, "http.encoding", encoding);
 		buffer = new byte [bufferSize];
+		cacheTool = Settings.get().getToolkit(HttpCacheTool.class);
 	}
 	
 	@Override
@@ -47,6 +64,8 @@ public class Download extends Servant {
 		
 		String path = getArgument("path","/",ctx);
 		String fsId = getArgument("domain","default",ctx);
+		String filename = getArgument("filename","",ctx);
+		String contentType = getArgument("contentType","",ctx);
 		
 		VirtualFileSystem fs = FileSystemSource.get().get(fsId);
 		
@@ -57,16 +76,29 @@ public class Download extends Servant {
 		InputStream in = null;
 
 		try {
+			if (cacheEnable){
+				cacheTool.cacheEnable(ctx);
+			}else{
+				cacheTool.cacheDisable(ctx);
+			}			
 			OutputStream out = ctx.getOutputStream();
 			in = fs.readFile(path);
 			if (in == null){
 				throw new ServantException("core.data_not_found","Can not find the file: " +  path);
 			}
 			
-			String filename = getArgument("file",path.substring(path.lastIndexOf("/")+1),ctx);
 			if (StringUtils.isNotEmpty(filename)){
-				ctx.setResponseHeader("Content-Disposition", String.format("attachment; filename=%s",filename));
+				try {
+					filename = URLEncoder.encode(filename, encoding);
+				} catch (UnsupportedEncodingException e) {
+				}
+				ctx.setResponseHeader("Content-Disposition", 
+					String.format("attachment; filename=%s;filename*=%s''%s",filename,encoding,filename));
 			}
+			
+			if (StringUtils.isNotEmpty(contentType)){
+				ctx.setResponseContentType(contentType);
+			}			
 			
 	        int size=0;  
 	        while((size=in.read(buffer))!=-1)  

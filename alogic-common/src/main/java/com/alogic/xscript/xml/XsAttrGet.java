@@ -17,6 +17,7 @@ import com.anysoft.util.PropertiesConstants;
  */
 public class XsAttrGet extends XsElementOperation{
 	protected String $id = "";
+	protected String $key = "";
 	protected String $dft = "";
 
 	public XsAttrGet(String tag, Logiclet p) {
@@ -27,16 +28,18 @@ public class XsAttrGet extends XsElementOperation{
 	public void configure(Properties p){
 		super.configure(p);
 		
-		$id = PropertiesConstants.getRaw(p,"id","$" + this.getXmlTag());
+		$id = PropertiesConstants.getRaw(p,"id","");
+		$key = PropertiesConstants.getRaw(p,"key",$id);
 		$dft = PropertiesConstants.getRaw(p,"dft",$dft);
 	}
 	@Override
 	protected void onExecute(Element elem, XsObject root, XsObject current,
 			LogicletContext ctx, ExecuteWatcher watcher) {
-		String id = PropertiesConstants.transform(ctx, $id, "$" + this.getXmlTag());
+		String id = PropertiesConstants.transform(ctx, $id, "");
 		
 		if (StringUtils.isNotEmpty(id)){
-			String value = elem.getAttribute(id);
+			String key = PropertiesConstants.transform(ctx, $key, id);
+			String value = elem.getAttribute(key);
 			if (StringUtils.isEmpty(value)){
 				value = PropertiesConstants.transform(ctx, $dft, "");
 			}
